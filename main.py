@@ -6,6 +6,35 @@ import face_recognition
 import os
 import numpy as np
 
+class MonitorControl:
+    def __init__(self, app):
+        self.app = app
+        self.black_screen = None  # Black screen window
+
+    def simulate_screen_off(self):
+        # Create a full-screen black window to simulate screen off
+        if not self.black_screen:
+            self.black_screen = tk.Toplevel(self.app.master)
+            self.black_screen.attributes("-fullscreen", True)
+            self.black_screen.config(bg='black')
+            self.black_screen.attributes("-topmost", True)  # Ensure it's on top
+            self.black_screen.overrideredirect(True)  # Remove window borders
+
+        self.black_screen.deiconify()  # Show the black screen
+
+    def simulate_screen_on(self):
+        # Hide the full-screen black window and resume the feed
+        if self.black_screen:
+            self.black_screen.withdraw()  # Hide the black screen
+
+    def handle_monitor(self, familiar_face_detected):
+        if familiar_face_detected:
+            # Turn the screen back on if a familiar face is detected
+            self.simulate_screen_on()
+        else:
+            # Turn the screen off if no familiar face is detected
+            self.simulate_screen_off()
+
 class FaceRecognitionApp:
     def __init__(self, master):
         self.master = master
@@ -19,6 +48,8 @@ class FaceRecognitionApp:
 
         self.label = Label(master)
         self.label.pack()
+
+        self.monitor_control = MonitorControl(self)  # Create MonitorControl instance
 
         self.update()
         self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -55,18 +86,13 @@ class FaceRecognitionApp:
             recognized_name = "False"  # Default value if no familiar face is detected
 
             for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-                # Initialize name as Unknown
                 name = "Unknown"
-
-                # Initialize variables for comparing face distances
                 threshold = 0.6  # Set a threshold to minimize false positives
 
                 # Check if the face matches any known faces
                 for person_name, encodings in self.known_face_encodings.items():
-                    # Compute distances from face_encoding to each known encoding
                     face_distances = face_recognition.face_distance(encodings, face_encoding)
-                    
-                    # Find the closest match
+
                     if face_distances.size > 0:
                         closest_distance = min(face_distances)
                         if closest_distance < threshold:
@@ -83,12 +109,11 @@ class FaceRecognitionApp:
 
             if familiar_face_detected:
                 recognized_name = name  # Update with the recognized name
-
-            # Print the result
-            if recognized_name == "False":
-                print("False")
             else:
-                print(f"Recognized: {recognized_name}")
+                print("False")
+
+            # Handle monitor based on recognition result
+            self.monitor_control.handle_monitor(familiar_face_detected)
 
             # Convert the frame to PhotoImage
             cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -104,7 +129,9 @@ class FaceRecognitionApp:
         self.vid.release()
         self.master.destroy()
 
+
 if __name__ == "__main__":
     root = tk.Tk()
     app = FaceRecognitionApp(root)
     root.mainloop()
+
